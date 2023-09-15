@@ -1,0 +1,91 @@
+#!/bin/bash
+
+FILE=${1:null}
+SAMPLERATE=${2:-8000}
+SAMPLEFORMAT=${3:-U8}
+echo $FILE $SAMPLERATE $SAMPLEFORMAT
+
+# turn down output volume
+amixer sset 'Master' 100% -q
+
+# what does this do?
+if [ -t 0 ]; then
+  SAVED_STTY="`stty --save`"
+  stty -echo -icanon -icrnl time 0 min 0
+fi
+
+count=0
+keypress=''
+
+
+if [[ "$FILE" = *.gif ]]
+#GIF LOGIC
+then
+# strip file extension
+# get filename, reverse, cut at . delimiter then reverse again...
+TMPFILE=$(echo $FILE | rev | cut -d. -f2- | rev )
+#TODO CHECK FOR TMP DIR FIRST ETC
+mkdir tmp
+  # add 6digit number format .bmp
+  convert $FILE ./tmp/$TMPFILE-%06d.bmp
+  wait
+
+  NUMFRAMES=$( ls tmp | wc -l )
+  echo There are $NUMFRAMES frames in tmp
+  
+  if [ TRUE ]    # ← PROPER ARGUMENT PARSING PLEASE
+  then
+  while [ "x$keypress" = "x" ]; do
+    for files in "tmp/*.bmp"
+    #TODO Want Counter to incriment each file
+    do
+      let count+=1
+      echo -ne $count'\r'
+      keypress="`cat -v`"
+      cat $files | aplay -t raw -r $SAMPLERATE -f $SAMPLEFORMAT
+      wait
+    done
+  done
+  else
+        for files in "tmp/*.bmp"
+    #TODO Want Counter to incriment each file
+    do
+      let count+=1
+      echo -ne $count'\r'
+      keypress="`cat -v`"
+      cat $files | aplay -t raw -r $SAMPLERATE -f $SAMPLEFORMAT
+      wait
+    done
+  fi
+    rm -r ./tmp/
+#GIF LOGIC END
+
+else
+  # standard looping single bmp souP functionality
+  while [ "x$keypress" = "x" ]; do
+    let count+=1
+    echo -ne $count'\r'
+    keypress="`cat -v`"
+
+    #reverse tail cut for header issues TODO
+    # tail -c +157 $FILE.bmp | aplay -t raw -r $SAMPLERATE -f $SAMPLEFORMAT
+    cp $FILE ./souP.bmp
+    SOUPFILE="souP.bmp"
+# Try convert image until success, if fail recopy bmp and try again.    
+    until convert $SOUPFILE -resample 10x50 $SOUPFILE
+      do
+        echo "fail convert"
+        cp $FILE ./souP.bmp
+      done
+
+    cat $SOUPFILE | aplay -t raw -r $SAMPLERATE -f $SAMPLEFORMAT
+    
+    wait
+  done
+fi
+
+if [ -t 0 ]; then stty "$SAVED_STTY"; fi
+
+echo "You pressed '$keypress' after $count loop iterations"
+echo "Thanks for using this script."
+exit 0
